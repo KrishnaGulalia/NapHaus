@@ -38,6 +38,8 @@ export default function NapHaus3D() {
   const [hov, setHov] = useState(null);
   const [interior, setInterior] = useState(false);
   const [hintFade, setHintFade] = useState(1);
+  const [showFlow, setShowFlow] = useState(false);
+  const [flowStep, setFlowStep] = useState(0);
 
   const computeInteriorWorld = useCallback(() => {
     // pod is positioned at (0, H/2 + T, 0)
@@ -1048,6 +1050,84 @@ export default function NapHaus3D() {
     { name:"A/C Vents + Dial",      note:"5 top-row grilles + personal flow control dial",      col:"#cc6611" },
   ];
 
+  // System Flow & Navigation — used by the "BOOK NOW" modal
+  const STEPS = [
+    {
+      n: "01", key: "BOOK",
+      title: "Book",
+      icon: "qr",
+      tag: "App · QR · UPI",
+      col: "#1e6ecc",
+      bg: "#e8f0fa",
+      desc: "Visit the NAPHAUS app or scan the in-station QR. Select a pod, slot duration, and pay via UPI. An OTP is sent instantly to your phone.",
+      meta: [["Choose slot", "3 / 6 / 12 / 24 hr"], ["Pay via", "UPI · Card · Wallet"], ["You receive", "6-digit OTP + map pin"]],
+    },
+    {
+      n: "02", key: "ENTER",
+      title: "Enter",
+      icon: "lock",
+      tag: "OTP unlock",
+      col: "#1a9966",
+      bg: "#e6f5ee",
+      desc: "Walk to the assigned pod. Enter your OTP on the front keypad — the motorized PP shutter rises silently and ambient LED greets you.",
+      meta: [["Identify pod", "Illuminated B1"], ["Unlock", "6-digit OTP"], ["Shutter", "Motorized rise · ~3 s"]],
+    },
+    {
+      n: "03", key: "SETTLE",
+      title: "Settle",
+      icon: "box",
+      tag: "Luggage · AC · Privacy",
+      col: "#cc6611",
+      bg: "#fdf1e6",
+      desc: "Stow luggage in the 100 L HDPE pull-out box and PIN-lock it. Adjust the personal AC vent dial, pull the inner curtain, and plug in devices via USB-A / USB-C / 5-pin socket.",
+      meta: [["Storage", "100 L · PIN-lock"], ["Climate", "Personal AC dial"], ["Power", "2×USB-A · USB-C · 5-pin"]],
+    },
+    {
+      n: "04", key: "REST",
+      title: "Rest / Work",
+      icon: "bed",
+      tag: "Foldable table · HD foam",
+      col: "#1e6ecc",
+      bg: "#e8f0fa",
+      desc: "Unfold the side table for laptop work or revision. Recline on the 10 cm HD-foam mattress with reading lamp on. Acoustic ceiling keeps it quiet.",
+      meta: [["Mattress", "HD foam · 10 cm"], ["Workspace", "Foldable Al + MDF"], ["Lighting", "Warm LED · dimmable"]],
+    },
+    {
+      n: "05", key: "ALERT",
+      title: "Alert",
+      icon: "bell",
+      tag: "SMS · Auto-rise",
+      col: "#1a9966",
+      bg: "#e6f5ee",
+      desc: "SMS reminder lands 15 minutes before your slot ends. At the end of slot, a soft chime plays and the shutter auto-rises gently — no surprises.",
+      meta: [["Reminder", "SMS · T-15 min"], ["End cue", "Soft chime"], ["Shutter", "Auto-rise · gentle"]],
+    },
+    {
+      n: "06", key: "EXIT",
+      title: "Exit & Rate",
+      icon: "star",
+      tag: "Checkout · Review",
+      col: "#cc6611",
+      bg: "#fdf1e6",
+      desc: "Collect luggage, step out, and rate your experience in the app. Loyalty points credit instantly and unlock discounts on your next stay.",
+      meta: [["Checkout", "Auto on shutter close"], ["Rating", "1–5 stars · 1 tap"], ["Rewards", "Points · next-stay disc."]],
+    },
+  ];
+
+  const Icon = ({ k, color = "currentColor", size = 22 }) => {
+    const c = color;
+    const sw = 1.7;
+    const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+      stroke: c, strokeWidth: sw, strokeLinecap: "round", strokeLinejoin: "round" };
+    if (k === "qr")   return (<svg {...common}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M20 14v3M14 20h3M20 20h.01"/></svg>);
+    if (k === "lock") return (<svg {...common}><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2"/></svg>);
+    if (k === "box")  return (<svg {...common}><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>);
+    if (k === "bed")  return (<svg {...common}><path d="M3 18V8M21 18v-6a3 3 0 0 0-3-3H10v6"/><path d="M3 13h18"/><path d="M3 21v-3M21 21v-3"/><circle cx="7" cy="11" r="1.5"/></svg>);
+    if (k === "bell") return (<svg {...common}><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2H4.5L6 16z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>);
+    if (k === "star") return (<svg {...common}><path d="M12 3l2.7 5.5 6 .9-4.4 4.3 1.1 6.1L12 17l-5.4 2.8 1.1-6.1L3.3 9.4l6-.9L12 3z"/></svg>);
+    return null;
+  };
+
   const ANNOT = [
     // Front view annotations (matching spatial design exactly)
     ["Round Alloy Frame", "Rounded corner cylinders, charcoal steel"],
@@ -1094,11 +1174,42 @@ export default function NapHaus3D() {
           </div>
           <span style={{ padding:"2px 9px", background:"#e8f0fa", border:`1px solid #c0d4ee`,
             borderRadius:4, color:C.acc, fontSize:10, fontWeight:600 }}>3D PROTOTYPE</span>
+          {/* ── BOOK NOW CTA ── */}
+          <button onClick={() => { setShowFlow(true); setFlowStep(0); }} style={{
+            marginLeft:10, padding:"6px 15px",
+            background:"linear-gradient(135deg,#1a1d24 0%,#2a2f3a 100%)",
+            color:"#ffcc44", border:"1px solid #333848",
+            borderRadius:7, cursor:"pointer", fontFamily:"inherit",
+            fontSize:11, fontWeight:700, letterSpacing:0.7,
+            boxShadow:"0 2px 10px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.06)",
+            display:"flex", alignItems:"center", gap:7,
+            transition:"transform 0.12s ease, box-shadow 0.12s ease"
+          }}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.22)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 2px 10px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.06)";}}
+          >
+            <span style={{ width:7, height:7, borderRadius:"50%", background:"#ffcc44",
+              boxShadow:"0 0 6px rgba(255,204,68,0.6)" }} />
+            BOOK NOW
+          </button>
         </div>
-        <div style={{ color:"#b0bac8", fontSize:10, letterSpacing:0.3 }}>
-          {interior
-            ? "INSIDE 360°  ·  DRAG TO LOOK  ·  SCROLL TO ZOOM"
-            : "DRAG TO ROTATE  ·  SCROLL TO ZOOM  ·  STEP INSIDE FOR 360°"}
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <button onClick={() => { setShowFlow(true); setFlowStep(0); }} style={{
+            padding:"4px 12px", background:"transparent", color:C.acc,
+            border:`1px solid ${C.bdr}`, borderRadius:5, cursor:"pointer",
+            fontFamily:"inherit", fontSize:10, fontWeight:600, letterSpacing:0.5,
+            transition:"all 0.12s"
+          }}
+            onMouseEnter={e=>{e.currentTarget.style.background="#e8f0fa";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}
+          >
+            HOW IT WORKS
+          </button>
+          <div style={{ color:"#b0bac8", fontSize:10, letterSpacing:0.3 }}>
+            {interior
+              ? "INSIDE 360°  ·  DRAG TO LOOK  ·  SCROLL TO ZOOM"
+              : "DRAG TO ROTATE  ·  SCROLL TO ZOOM  ·  STEP INSIDE FOR 360°"}
+          </div>
         </div>
       </div>
 
@@ -1387,6 +1498,276 @@ export default function NapHaus3D() {
           NAPHAUS · Spatial Design · Rishihood University
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════
+          SYSTEM FLOW & NAVIGATION — "BOOK NOW" MODAL
+          ══════════════════════════════════════════════════════════════ */}
+      {showFlow && (
+        <div style={{
+          position:"fixed", inset:0, zIndex:9999,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          background:"rgba(10,14,22,0.62)", backdropFilter:"blur(12px)",
+          animation:"fadeIn 0.25s ease"
+        }}
+          onClick={e => { if (e.target === e.currentTarget) setShowFlow(false); }}
+        >
+          <div style={{
+            width:"min(960px,92vw)", maxHeight:"90vh",
+            background:"#ffffff", borderRadius:16,
+            boxShadow:"0 24px 80px rgba(0,0,0,0.28), 0 2px 12px rgba(0,0,0,0.10)",
+            overflow:"hidden", display:"flex", flexDirection:"column",
+            animation:"slideUp 0.35s cubic-bezier(0.22,1,0.36,1)"
+          }}>
+
+            {/* ── Modal Header ── */}
+            <div style={{
+              padding:"22px 28px 16px",
+              background:"linear-gradient(135deg,#1a1d24 0%,#22272f 100%)",
+              color:"#ffffff", position:"relative"
+            }}>
+              <button onClick={() => setShowFlow(false)} style={{
+                position:"absolute", top:16, right:18,
+                width:30, height:30, borderRadius:8,
+                background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)",
+                color:"#8a94a4", fontSize:16, cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                transition:"all 0.12s", fontFamily:"inherit"
+              }}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.16)";e.currentTarget.style.color="#fff";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#8a94a4";}}
+              >&times;</button>
+
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                <div style={{ width:28, height:28, borderRadius:6, background:"#ffcc44",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  color:"#1a1d24", fontWeight:900, fontSize:13 }}>N</div>
+                <span style={{ fontSize:10, color:"#ffcc44", fontWeight:700, letterSpacing:1.8,
+                  textTransform:"uppercase" }}>NAPHAUS</span>
+              </div>
+              <div style={{ fontSize:20, fontWeight:800, letterSpacing:-0.2 }}>
+                System Flow &amp; Navigation
+              </div>
+              <div style={{ fontSize:11.5, color:"#8a96aa", marginTop:4, lineHeight:1.5 }}>
+                Book your pod in 60 seconds — 6 simple steps from scan to sleep.
+              </div>
+
+              {/* ── Step progress bar ── */}
+              <div style={{
+                display:"flex", gap:4, marginTop:14,
+                background:"rgba(255,255,255,0.06)", borderRadius:6, padding:3
+              }}>
+                {STEPS.map((s, i) => (
+                  <button key={s.key} onClick={() => setFlowStep(i)} style={{
+                    flex:1, padding:"6px 0", borderRadius:4, border:"none", cursor:"pointer",
+                    fontFamily:"inherit", fontSize:10, fontWeight:600, letterSpacing:0.4,
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+                    background: i === flowStep ? s.col : "transparent",
+                    color: i === flowStep ? "#fff" : "#6a7888",
+                    transition:"all 0.18s ease"
+                  }}>
+                    <span style={{
+                      width:16, height:16, borderRadius:"50%", fontSize:8.5, fontWeight:800,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      background: i === flowStep ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
+                      color: i === flowStep ? "#fff" : "#5a6472"
+                    }}>{s.n}</span>
+                    <span style={{ display: "inline" }}>{s.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Active Step Detail ── */}
+            <div style={{ flex:1, overflow:"auto", padding:"24px 28px 20px" }}>
+              {(() => {
+                const s = STEPS[flowStep];
+                return (
+                  <div style={{ display:"flex", gap:24, alignItems:"flex-start" }}>
+                    {/* Left — big icon + number */}
+                    <div style={{
+                      flexShrink:0, width:110,
+                      display:"flex", flexDirection:"column", alignItems:"center", gap:10
+                    }}>
+                      <div style={{
+                        width:80, height:80, borderRadius:20,
+                        background:s.bg, border:`2px solid ${s.col}22`,
+                        display:"flex", alignItems:"center", justifyContent:"center"
+                      }}>
+                        <Icon k={s.icon} color={s.col} size={36} />
+                      </div>
+                      <div style={{
+                        fontSize:36, fontWeight:900, color:s.col, opacity:0.18,
+                        letterSpacing:-2, lineHeight:1
+                      }}>{s.n}</div>
+                      <span style={{
+                        padding:"3px 10px", borderRadius:20,
+                        background:s.bg, color:s.col,
+                        fontSize:9, fontWeight:700, letterSpacing:0.5
+                      }}>{s.tag}</span>
+                    </div>
+
+                    {/* Right — content */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                        <span style={{
+                          fontSize:10, fontWeight:800, letterSpacing:2,
+                          color:s.col, textTransform:"uppercase"
+                        }}>STEP {s.n}</span>
+                        <span style={{
+                          width:40, height:2, borderRadius:1, background:s.col, opacity:0.3
+                        }} />
+                      </div>
+                      <div style={{
+                        fontSize:22, fontWeight:800, color:"#1a2030",
+                        letterSpacing:-0.3, marginBottom:10
+                      }}>{s.title}</div>
+                      <div style={{
+                        fontSize:13, color:"#4a5568", lineHeight:1.75,
+                        marginBottom:18
+                      }}>{s.desc}</div>
+
+                      {/* Meta cards */}
+                      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                        {s.meta.map(([label, val]) => (
+                          <div key={label} style={{
+                            flex:"1 1 140px", minWidth:130,
+                            padding:"10px 13px", borderRadius:10,
+                            background:s.bg, border:`1px solid ${s.col}18`
+                          }}>
+                            <div style={{
+                              fontSize:9, fontWeight:700, color:s.col,
+                              letterSpacing:1, textTransform:"uppercase", marginBottom:4
+                            }}>{label}</div>
+                            <div style={{
+                              fontSize:12, fontWeight:600, color:"#1a2030"
+                            }}>{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── 6-step mini overview strip ── */}
+            <div style={{
+              padding:"12px 28px", borderTop:"1px solid #eef0f5",
+              background:"#fafbfd"
+            }}>
+              <div style={{
+                display:"flex", alignItems:"stretch", gap:0
+              }}>
+                {STEPS.map((s, i) => {
+                  const active = i === flowStep;
+                  return (
+                    <div key={s.key} style={{ flex:1, display:"flex", alignItems:"center" }}>
+                      <button onClick={() => setFlowStep(i)} style={{
+                        flex:1, padding:"8px 4px", border:"none", cursor:"pointer",
+                        background:"transparent", fontFamily:"inherit",
+                        display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+                        opacity: active ? 1 : 0.55,
+                        transform: active ? "scale(1.08)" : "none",
+                        transition:"all 0.18s ease"
+                      }}>
+                        <div style={{
+                          width:28, height:28, borderRadius:8,
+                          background: active ? s.col : "#eef0f5",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          transition:"all 0.18s"
+                        }}>
+                          <Icon k={s.icon} color={active ? "#fff" : "#8a96a8"} size={14} />
+                        </div>
+                        <span style={{
+                          fontSize:8.5, fontWeight:700, color: active ? s.col : "#8a96a8",
+                          letterSpacing:0.3
+                        }}>{s.title}</span>
+                      </button>
+                      {i < STEPS.length - 1 && (
+                        <div style={{
+                          width:20, height:2, borderRadius:1, flexShrink:0,
+                          background: i < flowStep ? STEPS[i+1].col : "#dce2ea",
+                          transition:"background 0.2s"
+                        }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Modal Footer ── */}
+            <div style={{
+              padding:"14px 28px", borderTop:"1px solid #eef0f5",
+              display:"flex", justifyContent:"space-between", alignItems:"center",
+              background:"#ffffff"
+            }}>
+              <button onClick={() => setFlowStep(Math.max(0, flowStep - 1))} disabled={flowStep === 0}
+                style={{
+                  padding:"8px 18px", borderRadius:8, cursor: flowStep === 0 ? "default" : "pointer",
+                  background: flowStep === 0 ? "#f0f2f5" : "#ffffff",
+                  color: flowStep === 0 ? "#b0b8c4" : "#4a5568",
+                  border:`1px solid ${flowStep === 0 ? "#e8eaee" : "#d0d6de"}`,
+                  fontFamily:"inherit", fontSize:11, fontWeight:600, letterSpacing:0.3,
+                  transition:"all 0.12s", display:"flex", alignItems:"center", gap:6
+                }}
+                onMouseEnter={e => { if (flowStep > 0) e.currentTarget.style.background="#f5f7fa"; }}
+                onMouseLeave={e => { if (flowStep > 0) e.currentTarget.style.background="#ffffff"; }}
+              >
+                <span style={{ fontSize:13 }}>&larr;</span> Previous
+              </button>
+
+              <div style={{ display:"flex", gap:5 }}>
+                {STEPS.map((_, i) => (
+                  <div key={i} onClick={() => setFlowStep(i)} style={{
+                    width: i === flowStep ? 18 : 7, height:7, borderRadius:4,
+                    background: i === flowStep ? STEPS[flowStep].col : "#dce2ea",
+                    cursor:"pointer", transition:"all 0.2s ease"
+                  }} />
+                ))}
+              </div>
+
+              {flowStep < STEPS.length - 1 ? (
+                <button onClick={() => setFlowStep(flowStep + 1)} style={{
+                  padding:"8px 18px", borderRadius:8, cursor:"pointer",
+                  background: STEPS[flowStep].col,
+                  color:"#ffffff", border:"none",
+                  fontFamily:"inherit", fontSize:11, fontWeight:700, letterSpacing:0.3,
+                  boxShadow:`0 3px 12px ${STEPS[flowStep].col}44`,
+                  transition:"all 0.12s", display:"flex", alignItems:"center", gap:6
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="none";}}
+                >
+                  Next <span style={{ fontSize:13 }}>&rarr;</span>
+                </button>
+              ) : (
+                <button onClick={() => setShowFlow(false)} style={{
+                  padding:"8px 22px", borderRadius:8, cursor:"pointer",
+                  background:"linear-gradient(135deg,#1a1d24 0%,#2a2f3a 100%)",
+                  color:"#ffcc44", border:"1px solid #333848",
+                  fontFamily:"inherit", fontSize:11, fontWeight:700, letterSpacing:0.5,
+                  boxShadow:"0 3px 14px rgba(0,0,0,0.18)",
+                  transition:"all 0.12s", display:"flex", alignItems:"center", gap:7
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="none";}}
+                >
+                  <span style={{ width:7, height:7, borderRadius:"50%", background:"#ffcc44",
+                    boxShadow:"0 0 6px rgba(255,204,68,0.5)" }} />
+                  START BOOKING
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Keyframe animations ── */}
+      <style>{`
+        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes slideUp { from { opacity:0; transform:translateY(24px) scale(0.97) } to { opacity:1; transform:none } }
+      `}</style>
     </div>
   );
 }
